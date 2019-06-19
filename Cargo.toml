@@ -1,0 +1,7 @@
+[package]
+name = "bitap"
+version = "0.1.0"
+authors = ["Ward Muylaert <ward.muylaert@gmail.com>"]
+edition = "2018"
+
+[dependencies]
