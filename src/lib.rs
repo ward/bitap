@@ -16,9 +16,20 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
     let distance = 100; // What is this?
     let mut currentthreshold = 0.6;
 
-    // TODO
-    // best location check seems to be a speed up by using exact matching
-    // skipping for now
+    // Speed up by checking for an exact match
+    if let Some(found_idx) = text.find(pattern) {
+        let score = bitapscore(pattern, 0, found_idx as i64, expectedlocation, distance);
+        if score < currentthreshold {
+            currentthreshold = score;
+        }
+
+        if let Some(rfound_idx) = text.rfind(pattern) {
+            let score = bitapscore(pattern, 0, rfound_idx as i64, expectedlocation, distance);
+            if score < currentthreshold {
+                currentthreshold = score;
+            }
+        }
+    }
     let mut best_location = -1;
 
     let mut last_bits: Vec<i64> = vec![0; text.len() + pattern.len() + 2]; // TODO just trying to make this work, is this ok?
@@ -44,7 +55,7 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
             } else {
                 binmax = binmid;
             }
-            binmid = (binmax - binmid) / 2 + binmin;
+            binmid = (binmax - binmin) / 2 + binmin;
         }
         // result of the while becomes maximum for next iteration
         binmax = binmid;
@@ -55,7 +66,6 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
         } else {
             std::cmp::min(expectedlocation + binmid, textlength) + patternlength
         };
-        dbg!(finish);
 
         // init bit array
         let mut bitarr = vec![0; (finish + 2) as usize];
@@ -132,7 +142,7 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct SearchResult {
     is_match: bool,
     score: f64,
@@ -249,21 +259,43 @@ mod tests {
     }
 
     #[test]
-    fn test_bitap() {
-        // For "hello world", "elo":
-        // { isMatch: true,
-        //   score: 0.3433333333333333,
-        //   matchedIndices: [ [ 1, 4 ], [ 7, 7 ], [ 9, 9 ] ] }
+    fn test_bitap_hello_world() {
         let res = bitap("hello world", "elo");
-        let mut ok = true;
-        ok = ok && res.is_match == true;
-        ok = ok && res.score > 0.343 && res.score < 0.344;
-        println!("{:#?}", res);
-        assert!(ok);
         let mut indices = Vec::new();
         indices.push((1, 4));
         indices.push((7, 7));
         indices.push((9, 9));
-        assert_eq!(indices, res.matched_indices);
+        let goal = SearchResult {
+            is_match: true,
+            score: 0.343_333_333_333_333_3,
+            matched_indices: indices,
+        };
+        assert_eq!(res, goal);
+    }
+
+    #[test]
+    fn test_bitap_exact_hello_world() {
+        let res = bitap("hello world", "hello");
+        let mut indices = Vec::new();
+        indices.push((0, 4));
+        let goal = SearchResult {
+            is_match: true,
+            score: 0.001,
+            matched_indices: indices,
+        };
+        assert_eq!(res, goal);
+    }
+
+    #[test]
+    fn test_bitap_exact_hello_world2() {
+        let res = bitap("hello world", "llo");
+        let mut indices = Vec::new();
+        indices.push((2, 4));
+        let goal = SearchResult {
+            is_match: true,
+            score: 0.02,
+            matched_indices: indices,
+        };
+        assert_eq!(res, goal);
     }
 }
