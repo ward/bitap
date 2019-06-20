@@ -2,32 +2,34 @@ use std::collections::HashMap;
 
 // Following https://github.com/krisk/Fuse/blob/master/src/bitap/bitap_search.js
 // Probably should first do the supporting files in that folder
-pub fn bitap(text: &str, pattern: &str) {
+pub fn bitap(text: &str, pattern: &str) -> SearchResult {
     let textlength = text.len() as i64;
     let patternlength = pattern.len() as i64;
+    let findallmatches = false;
+
+    let pattern_alphabet = pattern_alphabet(pattern);
 
     // mask of the matches
-    let mut match_mask = vec![textlength; 0];
+    let mut match_mask = vec![0; textlength as usize];
 
     let expectedlocation = 0;
     let distance = 100; // What is this?
-    let currentthreshold = 0.6;
+    let mut currentthreshold = 0.6;
 
+    // TODO
     // best location check seems to be a speed up by using exact matching
     // skipping for now
+    let mut best_location = -1;
 
-    let best_location = -1;
-    let last_bits: Vec<i64> = vec![];
-    let finalscore = 1;
+    let mut last_bits: Vec<i64> = vec![0; text.len() + pattern.len() + 2]; // TODO just trying to make this work, is this ok?
+    let mut finalscore = 1.0;
     let mut binmax = textlength + patternlength;
 
     let mask = 1 << (patternlength - 1);
 
-    let mut binmin = 0;
-    let mut binmid = binmax;
     for i in 0..patternlength {
-        binmin = 0;
-        binmid = binmax;
+        let mut binmin = 0;
+        let mut binmid = binmax;
 
         while binmin < binmid {
             let score = bitapscore(
@@ -47,26 +49,93 @@ pub fn bitap(text: &str, pattern: &str) {
         // result of the while becomes maximum for next iteration
         binmax = binmid;
 
-        let start = std::cmp::max(1, expectedlocation - binmid + 1);
-        let findallmatches = true;
+        let mut start = std::cmp::max(1, expectedlocation - binmid + 1);
         let finish = if findallmatches {
             textlength
         } else {
             std::cmp::min(expectedlocation + binmid, textlength) + patternlength
         };
+        dbg!(finish);
 
         // init bit array
-        let mut bitarr = vec![finish + 2; 0];
+        let mut bitarr = vec![0; (finish + 2) as usize];
         bitarr[finish as usize + 1] = (1 << i) - 1;
+        dbg!(&bitarr);
 
-        let mut j = finish;
-        while j >= start {
+        let mut j = finish as usize;
+        while j >= start as usize {
             let currentlocation = j - 1;
-            //       let charMatch = patternAlphabet[text.charAt(currentLocation)]
+            let charidx = &text.chars().nth(currentlocation as usize);
+            let charmatch = *if charidx.is_some() {
+                pattern_alphabet.get(&charidx.unwrap()).unwrap_or(&0)
+            } else {
+                &0
+            };
+            if charmatch > 0 {
+                match_mask[currentlocation as usize] = 1;
+            }
+
+            // first pass exact match
+            // println!(
+            //     "bitarr len {}; last_bits len {}; j {}",
+            //     bitarr.len(),
+            //     last_bits.len(),
+            //     j
+            // );
+            bitarr[j] = ((bitarr[j + 1] << 1) | 1) & charmatch;
+
+            // subsequent passes fuzzy match
+            if i != 0 {
+                bitarr[j] |= (((last_bits[j + 1] | last_bits[j]) << 1) | 1) | last_bits[j + 1];
+            }
+            dbg!(bitarr[j]);
+
+            if bitarr[j] & mask > 0 {
+                finalscore = bitapscore(
+                    pattern,
+                    i,
+                    currentlocation as i64,
+                    expectedlocation,
+                    distance,
+                );
+
+                if finalscore <= currentthreshold {
+                    currentthreshold = finalscore;
+                    best_location = currentlocation as i64;
+
+                    if best_location <= expectedlocation {
+                        break;
+                    }
+
+                    start = std::cmp::max(1, 2 * expectedlocation - best_location as i64);
+                }
+            }
 
             j -= 1;
+        } // end while
+        dbg!(expectedlocation);
+        dbg!(i);
+
+        let score = bitapscore(pattern, i + 1, expectedlocation, expectedlocation, distance);
+
+        if score > currentthreshold {
+            break;
         }
+
+        last_bits = bitarr;
     }
+
+    SearchResult {
+        is_match: best_location >= 0,
+        score: if finalscore == 0.0 { 0.001 } else { finalscore },
+    }
+}
+
+#[derive(Debug)]
+pub struct SearchResult {
+    is_match: bool,
+    score: f64,
+    // TODO: matchedIndices
 }
 
 fn bitapscore(
@@ -81,12 +150,12 @@ fn bitapscore(
 
     if distance == 0 {
         if proximity as i64 != 0 {
-            return 1.0;
+            1.0
         } else {
-            return accuracy;
+            accuracy
         }
     } else {
-        return accuracy + (proximity / distance as f64);
+        accuracy + (proximity / distance as f64)
     }
 }
 
@@ -120,7 +189,7 @@ mod tests {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     #[test]
@@ -147,5 +216,19 @@ mod tests {
         let mut hm = HashMap::new();
         hm.insert('a', 1023);
         assert!(equal_hashmaps(&pattern_alphabet("aaaaaaaaaa"), &hm));
+    }
+
+    #[test]
+    fn test_bitap() {
+        // For "hello world", "elo":
+        // { isMatch: true,
+        //   score: 0.3433333333333333,
+        //   matchedIndices: [ [ 1, 4 ], [ 7, 7 ], [ 9, 9 ] ] }
+        let res = bitap("hello world", "elo");
+        let mut ok = true;
+        ok = ok && res.is_match == true;
+        ok = ok && res.score > 0.343 && res.score < 0.344;
+        println!("{:#?}", res);
+        assert!(ok);
     }
 }
