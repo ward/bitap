@@ -128,6 +128,7 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
     SearchResult {
         is_match: best_location >= 0,
         score: if finalscore == 0.0 { 0.001 } else { finalscore },
+        matched_indices: matched_indices(match_mask, 1),
     }
 }
 
@@ -135,7 +136,7 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
 pub struct SearchResult {
     is_match: bool,
     score: f64,
-    // TODO: matchedIndices
+    matched_indices: Vec<(i64, i64)>,
 }
 
 fn bitapscore(
@@ -171,6 +172,35 @@ fn pattern_alphabet(pattern: &str) -> HashMap<char, i64> {
             .and_modify(|charmask| *charmask |= 1 << (patternlength - i - 1));
     }
     mask
+}
+
+fn matched_indices(matchmask: Vec<i64>, min_match_char_length: i64) -> Vec<(i64, i64)> {
+    let mut matched_indices = vec![];
+    let mut start = -1;
+    let mut end = -1;
+    let mut i = 0;
+    let matchmask_len = matchmask.len() as i64;
+
+    while i < matchmask_len {
+        let a_match = matchmask[i as usize];
+        if a_match != 0 && start == -1 {
+            start = i
+        } else if a_match == 0 && start != -1 {
+            end = i - 1;
+            if (end - start) + 1 >= min_match_char_length {
+                matched_indices.push((start, end));
+            }
+            start = -1;
+        }
+
+        i += 1;
+    }
+
+    if matchmask[i as usize - 1] != 0 && (i - start) >= min_match_char_length {
+        matched_indices.push((start, i - 1));
+    }
+
+    matched_indices
 }
 
 #[cfg(test)]
@@ -230,5 +260,10 @@ mod tests {
         ok = ok && res.score > 0.343 && res.score < 0.344;
         println!("{:#?}", res);
         assert!(ok);
+        let mut indices = Vec::new();
+        indices.push((1, 4));
+        indices.push((7, 7));
+        indices.push((9, 9));
+        assert_eq!(indices, res.matched_indices);
     }
 }
