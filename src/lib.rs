@@ -150,9 +150,9 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
 
 #[derive(Debug, PartialEq)]
 pub struct SearchResult {
-    is_match: bool,
-    score: f64,
-    matched_indices: Vec<(i64, i64)>,
+    pub is_match: bool,
+    pub score: f64,
+    pub matched_indices: Vec<(i64, i64)>,
 }
 
 fn bitapscore(
