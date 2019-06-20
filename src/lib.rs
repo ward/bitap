@@ -1,5 +1,21 @@
 use std::collections::HashMap;
 
+/// Looks for pattern in haystack. Returns a vector of matches, best matches first
+pub fn search<'a, I>(pattern: &str, haystack: I) -> Vec<&'a str>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut matches = vec![];
+    for s in haystack {
+        let result = bitap(s, pattern);
+        if result.is_match {
+            matches.push((result.score, s));
+        }
+    }
+    matches.sort_by(|(score, _s), (score2, _s2)| score.partial_cmp(score2).unwrap());
+    matches.iter().map(|(_score, s)| *s).collect()
+}
+
 // Following https://github.com/krisk/Fuse/blob/master/src/bitap/bitap_search.js
 // Probably should first do the supporting files in that folder
 pub fn bitap(text: &str, pattern: &str) -> SearchResult {
@@ -70,7 +86,6 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
         // init bit array
         let mut bitarr = vec![0; (finish + 2) as usize];
         bitarr[finish as usize + 1] = (1 << i) - 1;
-        dbg!(&bitarr);
 
         let mut j = finish as usize;
         while j >= start as usize {
@@ -86,19 +101,12 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
             }
 
             // first pass exact match
-            // println!(
-            //     "bitarr len {}; last_bits len {}; j {}",
-            //     bitarr.len(),
-            //     last_bits.len(),
-            //     j
-            // );
             bitarr[j] = ((bitarr[j + 1] << 1) | 1) & charmatch;
 
             // subsequent passes fuzzy match
             if i != 0 {
                 bitarr[j] |= (((last_bits[j + 1] | last_bits[j]) << 1) | 1) | last_bits[j + 1];
             }
-            dbg!(bitarr[j]);
 
             if bitarr[j] & mask > 0 {
                 finalscore = bitapscore(
@@ -123,8 +131,6 @@ pub fn bitap(text: &str, pattern: &str) -> SearchResult {
 
             j -= 1;
         } // end while
-        dbg!(expectedlocation);
-        dbg!(i);
 
         let score = bitapscore(pattern, i + 1, expectedlocation, expectedlocation, distance);
 
@@ -187,7 +193,6 @@ fn pattern_alphabet(pattern: &str) -> HashMap<char, i64> {
 fn matched_indices(matchmask: Vec<i64>, min_match_char_length: i64) -> Vec<(i64, i64)> {
     let mut matched_indices = vec![];
     let mut start = -1;
-    let mut end = -1;
     let mut i = 0;
     let matchmask_len = matchmask.len() as i64;
 
@@ -196,7 +201,7 @@ fn matched_indices(matchmask: Vec<i64>, min_match_char_length: i64) -> Vec<(i64,
         if a_match != 0 && start == -1 {
             start = i
         } else if a_match == 0 && start != -1 {
-            end = i - 1;
+            let end = i - 1;
             if (end - start) + 1 >= min_match_char_length {
                 matched_indices.push((start, end));
             }
@@ -297,5 +302,27 @@ mod tests {
             matched_indices: indices,
         };
         assert_eq!(res, goal);
+    }
+
+    #[test]
+    fn test_pattern_longer_than_text() {
+        // Mostly to see what happens then. Perhaps infuture hotwire a failure?
+        // Otoh, "hello", "hello world" would still have some number...
+        let res = bitap("a", "hello world");
+        println!("{:#?}", res);
+        // assert!(false);
+    }
+
+    #[test]
+    fn test_search() {
+        let mut haystack = vec![];
+        haystack.push("hello world");
+        haystack.push("Belgium");
+        haystack.push("Running");
+        haystack.push("Run away");
+        haystack.push("ello mate");
+        haystack.push("ward muylaert");
+        dbg!(search("word", haystack));
+        // panic!();
     }
 }
