@@ -58,6 +58,16 @@ impl Bitap {
         let textlength = text.len() as i64;
         let patternlength = pattern.len() as i64;
 
+        // If no pattern provided, just say no match
+        // Could also make a case for full match?
+        if patternlength == 0 {
+            return SearchResult {
+                is_match: false,
+                score: 1.0,
+                matched_indices: vec![],
+            };
+        }
+
         let pattern_alphabet = Bitap::pattern_alphabet(pattern);
 
         // mask of the matches
@@ -386,5 +396,18 @@ mod tests {
         haystack.push("ward muylaert");
         dbg!(bitap.search("word", haystack));
         // panic!();
+    }
+
+    #[test]
+    fn test_empty_query() {
+        let bitap = Bitap::new();
+        assert_eq!(
+            bitap.bitap("hello world", ""),
+            SearchResult {
+                is_match: false,
+                score: 1.0,
+                matched_indices: vec![]
+            }
+        );
     }
 }
