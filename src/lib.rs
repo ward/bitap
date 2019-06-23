@@ -1,27 +1,37 @@
+//! Library for approximate string matching (fuzzy searching) using the bitap algorithm.
+//! To search, first create a Bitap struct. This enables you to set options. Builder pattern of
+//! sorts. Once you have that done, you can use bitap() or search() to actually search.
+//!
+//! ```
+//! let bitap = Bitap::new().distance(200).threshold(0.4);
+//! bitap.bitap("hello world", "elo");
+//! ```
+
 use std::collections::HashMap;
 
 pub struct Bitap {
+    distance: i64,
     expected_location: i64,
-    distance: i64, // What is this exactly?
-    threshold: f64,
     find_all_matches: bool,
     min_match_char_length: i64,
+    threshold: f64,
 }
 impl Bitap {
+    /// Create Bitap configuration struct
     pub fn new() -> Bitap {
         std::default::Default::default()
+    }
+
+    /// Set the penalty a match receives when it is further away from the expected location in the
+    /// text. A higher number means a lower penalty for being further away.
+    pub fn distance(self, distance: i64) -> Bitap {
+        Bitap { distance, ..self }
     }
     pub fn expected_location(self, expected_location: i64) -> Bitap {
         Bitap {
             expected_location,
             ..self
         }
-    }
-    pub fn distance(self, distance: i64) -> Bitap {
-        Bitap { distance, ..self }
-    }
-    pub fn threshold(self, threshold: f64) -> Bitap {
-        Bitap { threshold, ..self }
     }
     pub fn find_all_matches(self, find_all_matches: bool) -> Bitap {
         Bitap {
@@ -35,7 +45,14 @@ impl Bitap {
             ..self
         }
     }
-    /// Looks for pattern in haystack. Returns a vector of matches, best matches first
+    /// The threshold (in the bitap score, part of the result) to consider something a match. The
+    /// lower this number, the more something needs to match. Ranges from 0 to 1.
+    pub fn threshold(self, threshold: f64) -> Bitap {
+        Bitap { threshold, ..self }
+    }
+
+    /// Looks for pattern in several texts. Returns a vector of texts for which a match was found.
+    /// Texts with the best matches come first.
     pub fn search<'a, I>(&self, pattern: &str, haystack: I) -> Vec<&'a str>
     where
         I: IntoIterator<Item = &'a str>,
@@ -200,6 +217,7 @@ impl Bitap {
             matched_indices: Bitap::matched_indices(match_mask, self.min_match_char_length),
         }
     }
+
     fn bitapscore(
         pattern: &str,
         errors: i64,
@@ -263,6 +281,7 @@ impl Bitap {
         matched_indices
     }
 }
+
 impl std::default::Default for Bitap {
     fn default() -> Self {
         Bitap {
