@@ -3,6 +3,8 @@
 //! sorts. Once you have that done, you can use bitap() or search() to actually search.
 //!
 //! ```
+//! use bitap::Bitap;
+//!
 //! let bitap = Bitap::new().distance(200).threshold(0.4);
 //! bitap.bitap("hello world", "elo");
 //! ```
@@ -71,14 +73,14 @@ impl Bitap {
     /// Calculate approximate string match (fuzzy search) using the bitap search algorithm.
     /// Implementation based on the implementation by the Fuse JavaScript library at
     /// https://github.com/krisk/Fuse/blob/master/src/bitap/bitap_search.js.
-    pub fn bitap(&self, text: &str, pattern: &str) -> SearchResult {
+    pub fn bitap(&self, text: &str, pattern: &str) -> BitapResult {
         let textlength = text.len() as i64;
         let patternlength = pattern.len() as i64;
 
         // If no pattern provided, just say no match
         // Could also make a case for full match?
         if patternlength == 0 {
-            return SearchResult {
+            return BitapResult {
                 is_match: false,
                 score: 1.0,
                 matched_indices: vec![],
@@ -211,7 +213,7 @@ impl Bitap {
             last_bits = bitarr;
         }
 
-        SearchResult {
+        BitapResult {
             is_match: best_location >= 0,
             score: if finalscore == 0.0 { 0.001 } else { finalscore },
             matched_indices: Bitap::matched_indices(match_mask, self.min_match_char_length),
@@ -295,7 +297,7 @@ impl std::default::Default for Bitap {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct SearchResult {
+pub struct BitapResult {
     pub is_match: bool,
     pub score: f64,
     pub matched_indices: Vec<(i64, i64)>,
@@ -357,7 +359,7 @@ mod tests {
         indices.push((1, 4));
         indices.push((7, 7));
         indices.push((9, 9));
-        let goal = SearchResult {
+        let goal = BitapResult {
             is_match: true,
             score: 0.343_333_333_333_333_3,
             matched_indices: indices,
@@ -371,7 +373,7 @@ mod tests {
         let res = bitap.bitap("hello world", "hello");
         let mut indices = Vec::new();
         indices.push((0, 4));
-        let goal = SearchResult {
+        let goal = BitapResult {
             is_match: true,
             score: 0.001,
             matched_indices: indices,
@@ -385,7 +387,7 @@ mod tests {
         let res = bitap.bitap("hello world", "llo");
         let mut indices = Vec::new();
         indices.push((2, 4));
-        let goal = SearchResult {
+        let goal = BitapResult {
             is_match: true,
             score: 0.02,
             matched_indices: indices,
@@ -422,7 +424,7 @@ mod tests {
         let bitap = Bitap::new();
         assert_eq!(
             bitap.bitap("hello world", ""),
-            SearchResult {
+            BitapResult {
                 is_match: false,
                 score: 1.0,
                 matched_indices: vec![]
