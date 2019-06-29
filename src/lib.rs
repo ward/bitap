@@ -215,7 +215,11 @@ impl Bitap {
 
         BitapResult {
             is_match: best_location >= 0,
-            score: if finalscore == 0.0 { 0.001 } else { finalscore },
+            score: if finalscore == 0.0 {
+                0.000_000_001
+            } else {
+                finalscore
+            },
             matched_indices: Bitap::matched_indices(match_mask, self.min_match_char_length),
         }
     }
